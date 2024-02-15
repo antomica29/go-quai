@@ -30,21 +30,21 @@ import (
 	"github.com/dominant-strategies/go-quai/common/hexutil"
 )
 
-var testAddrHex = "970e8128ab834e8eac17ab8e3812f010678cf791"
-var testPrivHex = "289c2857d4598e37fb9647507e47a309d6133539bf21a8b9cb6df88fd5232032"
+var (
+	testAddrHex        = "970e8128ab834e8eac17ab8e3812f010678cf791"
+	testPrivHex        = "289c2857d4598e37fb9647507e47a309d6133539bf21a8b9cb6df88fd5232032"
+	expectedKeccakHash = "4e03657aea45a94fc7d47ba826c8d667c0d1e6e33a64a036ec44f58fa12d6c45"
+)
 
-// These tests are sanity checks.
-// They should ensure that we don't e.g. use Sha3-224 instead of Sha3-256
-// and that the sha3 library uses keccak-f permutation.
 func TestKeccak256Hash(t *testing.T) {
 	msg := []byte("abc")
-	exp, _ := hex.DecodeString("4e03657aea45a94fc7d47ba826c8d667c0d1e6e33a64a036ec44f58fa12d6c45")
+	exp, _ := hex.DecodeString(expectedKeccakHash)
 	checkhash(t, "Sha3-256-array", func(in []byte) []byte { h := Keccak256Hash(in); return h[:] }, msg, exp)
 }
 
 func TestKeccak256Hasher(t *testing.T) {
 	msg := []byte("abc")
-	exp, _ := hex.DecodeString("4e03657aea45a94fc7d47ba826c8d667c0d1e6e33a64a036ec44f58fa12d6c45")
+	exp, _ := hex.DecodeString(expectedKeccakHash)
 	hasher := NewKeccakState()
 	checkhash(t, "Sha3-256-array", func(in []byte) []byte { h := HashData(hasher, in); return h[:] }, msg, exp)
 }
@@ -55,13 +55,6 @@ func TestToECDSAErrors(t *testing.T) {
 	}
 	if _, err := HexToECDSA("ffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff"); err == nil {
 		t.Fatal("HexToECDSA should've returned error")
-	}
-}
-
-func BenchmarkSha3(b *testing.B) {
-	a := []byte("hello world")
-	for i := 0; i < b.N; i++ {
-		Keccak256(a)
 	}
 }
 
@@ -111,7 +104,6 @@ func TestSign(t *testing.T) {
 		t.Errorf("Address mismatch: want: %x have: %x", addr, recoveredAddr)
 	}
 
-	// should be equal to SigToPub
 	recoveredPub2, err := SigToPub(msg, sig)
 	if err != nil {
 		t.Errorf("ECRecover error: %s", err)
@@ -135,7 +127,6 @@ func TestNewContractAddress(t *testing.T) {
 	key, _ := HexToECDSA(testPrivHex)
 	addr := common.HexToAddress(testAddrHex)
 	genAddr := PubkeyToAddress(key.PublicKey)
-	// sanity check before using addr to create contract address
 	checkAddr(t, genAddr, addr)
 
 	caddr0 := CreateAddress(addr, 0, []byte{})
@@ -152,14 +143,12 @@ func TestLoadECDSA(t *testing.T) {
 		input string
 		err   string
 	}{
-		// good
 		{input: "0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef"},
 		{input: "0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef\n"},
 		{input: "0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef\n\r"},
 		{input: "0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef\r\n"},
 		{input: "0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef\n\n"},
 		{input: "0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef\n\r"},
-		// bad
 		{
 			input: "0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcde",
 			err:   "key file too short, want 64 hex characters",
@@ -236,20 +225,17 @@ func TestValidateSignatureValues(t *testing.T) {
 	zero := common.Big0
 	secp256k1nMinus1 := new(big.Int).Sub(secp256k1N, common.Big1)
 
-	// correct v,r,s
 	check(true, 0, one, one)
 	check(true, 1, one, one)
-	// incorrect v, correct r,s,
+
 	check(false, 2, one, one)
 	check(false, 3, one, one)
 
-	// incorrect v, combinations of incorrect/correct r,s at lower limit
 	check(false, 2, zero, zero)
 	check(false, 2, zero, one)
 	check(false, 2, one, zero)
 	check(false, 2, one, one)
 
-	// correct v for any combination of incorrect r,s
 	check(false, 0, zero, zero)
 	check(false, 0, zero, one)
 	check(false, 0, one, zero)
@@ -258,15 +244,12 @@ func TestValidateSignatureValues(t *testing.T) {
 	check(false, 1, zero, one)
 	check(false, 1, one, zero)
 
-	// correct sig with max r and s above upper limit
 	check(false, 0, secp256k1nMinus1, secp256k1nMinus1)
-	// correct v, combinations of incorrect r,s at upper limit
+
 	check(false, 0, secp256k1N, secp256k1nMinus1)
 	check(false, 0, secp256k1nMinus1, secp256k1N)
 	check(false, 0, secp256k1N, secp256k1N)
 
-	// current callers ensures r,s cannot be negative, but let's test for that too
-	// as crypto package could be used stand-alone
 	check(false, 0, minusOne, one)
 	check(false, 0, one, minusOne)
 }
@@ -284,8 +267,6 @@ func checkAddr(t *testing.T, addr0, addr1 common.Address) {
 	}
 }
 
-// test to help Python team with integration of libsecp256k1
-// skip but keep it after they are done
 func TestPythonIntegration(t *testing.T) {
 	kh := "289c2857d4598e37fb9647507e47a309d6133539bf21a8b9cb6df88fd5232032"
 	k0, _ := HexToECDSA(kh)
